@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+business_operations.sqlite3
+business_operations.sqlite3-journal
+business_operations.sqlite3-wal
+business_operations.sqlite3-shm
