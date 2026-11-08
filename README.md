@@ -32,6 +32,23 @@ py -m venv .venv
 SQLite is included with Python; no separate database service is needed.
 FastAPI and a model provider can be added when the workflow needs them.
 
+## Check before committing
+
+After setup, run the local checks with Bash (for example, Git Bash on Windows):
+
+```bash
+bash scripts/check.sh
+```
+
+The script runs Ruff's configured error and Pyflakes checks, the full pytest
+suite (unit and CLI integration tests), and Git whitespace checks for staged
+and unstaged changes. It stops and returns a nonzero exit code when a check
+fails. Git's whitespace checks do
+not include untracked files; stage new files before running the script to check
+them. The checks use the project virtual environment and do not install packages
+or modify source files. If dependencies are missing, rerun the install command
+above.
+
 ## Review a draft
 
 After setup, run:
