@@ -54,8 +54,14 @@ reports an error instead of confirming the decision.
 To inspect saved reviews from PowerShell in the same directory:
 
 ```powershell
-.\.venv\Scripts\python.exe -c "import sqlite3; con = sqlite3.connect('business_operations.sqlite3'); print(*con.execute('SELECT id, reviewed_at, order_id, decision FROM reviews'), sep='\n'); con.close()"
+.\.venv\Scripts\python.exe -m business_operations list
+.\.venv\Scripts\python.exe -m business_operations show 1
 ```
+
+`list` shows up to 50 reviews, newest first, with their IDs, UTC review times,
+order IDs, and decisions. `show` displays the saved request and draft for a
+specific review ID. These commands only read the database; they do not create
+one if it is missing or change any review.
 
 ## Use the drafting function
 

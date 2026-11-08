@@ -1,5 +1,6 @@
 """Review an overdue-order draft from the terminal."""
 
+import argparse
 import sqlite3
 import sys
 from pathlib import Path
@@ -7,7 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from business_operations.models import OverdueOrderInput
-from business_operations.reviews import ReviewDecision, save_review
+from business_operations.reviews import ReviewDecision, get_review, list_reviews, save_review
 from business_operations.workflows import draft_overdue_order_response
 
 
@@ -15,6 +16,59 @@ DATABASE_PATH = Path("business_operations.sqlite3")
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Review overdue-order drafts.")
+    commands = parser.add_subparsers(dest="command")
+    commands.add_parser("list", help="List the 50 most recent saved reviews.")
+    show_parser = commands.add_parser("show", help="Show a saved review.")
+    show_parser.add_argument("review_id", type=int, help="Positive review ID.")
+    args = parser.parse_args()
+
+    if args.command == "show" and args.review_id <= 0:
+        show_parser.error("review_id must be a positive integer")
+    if args.command in ("list", "show"):
+        return show_saved_reviews(args.command, args.review_id if args.command == "show" else None)
+
+    return review_draft()
+
+
+def show_saved_reviews(command: str, review_id: int | None) -> int:
+    if not DATABASE_PATH.exists():
+        print("No review database found in the current directory.", file=sys.stderr)
+        return 1
+    try:
+        if command == "list":
+            reviews = list_reviews(DATABASE_PATH)
+            if not reviews:
+                print("No saved reviews.")
+            for review in reviews:
+                print(
+                    f"{review.id}\t{review.reviewed_at}\t"
+                    f"{review.order_id}\t{review.decision.value}"
+                )
+            return 0
+
+        assert review_id is not None
+        review = get_review(DATABASE_PATH, review_id)
+        if review is None:
+            print(f"Review {review_id} not found.", file=sys.stderr)
+            return 1
+        print(
+            f"Review: {review.summary.id}\n"
+            f"Reviewed at (UTC): {review.summary.reviewed_at}\n"
+            f"Decision: {review.summary.decision.value}\n"
+            f"Order ID: {review.summary.order_id}\n"
+            f"Order status: {review.order_status}\n"
+            f"\nCustomer message:\n{review.customer_message}\n"
+            f"\nProposed reply:\n{review.proposed_reply}\n"
+            f"\nSuggested follow-up:\n{review.follow_up_task}"
+        )
+        return 0
+    except (sqlite3.Error, ValueError) as error:
+        print(f"Could not read reviews: {error}", file=sys.stderr)
+        return 1
+
+
+def review_draft() -> int:
     try:
         customer_message = input("Customer message: ")
         order_id = input("Order ID: ")

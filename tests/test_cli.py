@@ -98,3 +98,96 @@ def test_review_reports_storage_failure(tmp_path):
     assert completed.returncode == 1
     assert "Could not save review; no decision recorded:" in completed.stderr
     assert "Draft approved" not in completed.stdout
+
+
+def run_command(cwd, *args):
+    return subprocess.run(
+        [sys.executable, "-m", "business_operations", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_list_and_show_saved_reviews(tmp_path):
+    first = run_review("First message\nORD-123\ndelayed\nyes\n", tmp_path)
+    second = run_review("Second message\nORD-456\nunknown\nno\n", tmp_path)
+    assert first.returncode == second.returncode == 0
+    database_path = tmp_path / "business_operations.sqlite3"
+    original_database = database_path.read_bytes()
+    with sqlite3.connect(database_path) as connection:
+        reviewed_at, reply, follow_up = connection.execute(
+            "SELECT reviewed_at, proposed_reply, follow_up_task FROM reviews WHERE id = 1"
+        ).fetchone()
+
+    listed = run_command(tmp_path, "list")
+    assert listed.returncode == 0
+    lines = listed.stdout.splitlines()
+    assert len(lines) == 2
+    assert lines[0].startswith("2\t") and lines[0].endswith("\tORD-456\trejected")
+    assert lines[1].startswith("1\t") and lines[1].endswith("\tORD-123\tapproved")
+
+    shown = run_command(tmp_path, "show", "1")
+    assert shown.returncode == 0
+    assert "Review: 1" in shown.stdout
+    assert "Decision: approved" in shown.stdout
+    assert "Order ID: ORD-123" in shown.stdout
+    assert "Order status: delayed" in shown.stdout
+    assert "Customer message:\nFirst message" in shown.stdout
+    assert f"Reviewed at (UTC): {reviewed_at}" in shown.stdout
+    assert f"Proposed reply:\n{reply}" in shown.stdout
+    assert f"Suggested follow-up:\n{follow_up}" in shown.stdout
+    assert database_path.read_bytes() == original_database
+
+
+@pytest.mark.parametrize("args", [("list",), ("show", "1")])
+def test_history_does_not_create_missing_database(tmp_path, args):
+    completed = run_command(tmp_path, *args)
+    assert completed.returncode == 1
+    assert "No review database found" in completed.stderr
+    assert not (tmp_path / "business_operations.sqlite3").exists()
+
+
+def test_show_missing_review(tmp_path):
+    assert run_review("Message\nORD-123\ndelayed\nyes\n", tmp_path).returncode == 0
+    completed = run_command(tmp_path, "show", "99")
+    assert completed.returncode == 1
+    assert "Review 99 not found." in completed.stderr
+
+
+@pytest.mark.parametrize("review_id", ["0", "-1", "abc"])
+def test_show_rejects_invalid_id(tmp_path, review_id):
+    completed = run_command(tmp_path, "show", review_id)
+    assert completed.returncode == 2
+    assert "review_id" in completed.stderr
+    assert not (tmp_path / "business_operations.sqlite3").exists()
+
+
+def test_history_reports_invalid_database(tmp_path):
+    (tmp_path / "business_operations.sqlite3").write_text("not a database")
+    completed = run_command(tmp_path, "list")
+    assert completed.returncode == 1
+    assert "Could not read reviews:" in completed.stderr
+
+
+def test_list_empty_database_and_limits_results(tmp_path):
+    assert run_review("Message\nORD-123\ndelayed\nyes\n", tmp_path).returncode == 0
+    with sqlite3.connect(tmp_path / "business_operations.sqlite3") as connection:
+        connection.execute("DELETE FROM reviews")
+    empty = run_command(tmp_path, "list")
+    assert empty.returncode == 0
+    assert "No saved reviews." in empty.stdout
+
+    with sqlite3.connect(tmp_path / "business_operations.sqlite3") as connection:
+        connection.executemany(
+            "INSERT INTO reviews (customer_message, order_id, order_status, "
+            "proposed_reply, follow_up_task, decision) VALUES (?, ?, ?, ?, ?, ?)",
+            [("Message", f"ORD-{i}", "unknown", "Reply", "Follow up", "approved") for i in range(55)],
+        )
+    listed = run_command(tmp_path, "list")
+    assert listed.returncode == 0
+    lines = listed.stdout.splitlines()
+    assert len(lines) == 50
+    assert lines[0].startswith("55\t")
+    assert lines[-1].startswith("6\t")
