@@ -49,6 +49,11 @@ them. The checks use the project virtual environment and do not install packages
 or modify source files. If dependencies are missing, rerun the install command
 above.
 
+GitHub Actions runs the same script on pushes, pull requests, and manual
+workflow dispatches. It tests Python 3.10 and 3.14 on Linux and Windows.
+The script's Git whitespace checks inspect local staged and unstaged changes;
+on a clean CI checkout they do not check the submitted commit diff.
+
 ## Review a draft
 
 After setup, run:
