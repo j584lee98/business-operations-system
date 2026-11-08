@@ -5,9 +5,9 @@ an owner respond to a customer asking about an overdue order.
 
 ## Current scope
 
-This project defines validated input and output models and a deterministic
-drafting function for that workflow. It does not send replies, approve actions,
-connect to external services, or save workflow state.
+This project defines validated input and output models, a deterministic
+drafting function, and a terminal-based draft review. It does not send replies,
+create tasks, connect to external services, or save workflow state.
 
 The input contains a customer message and an order ID and status. The output
 contains a proposed reply and a follow-up task. `unknown` is available when the
@@ -16,7 +16,8 @@ order status is not known.
 The drafting function uses the supplied order ID and status to produce a
 template reply and follow-up task. It does not interpret the customer message
 or verify the order status. The result is a draft for the owner to review; no
-message is sent and no task is created.
+message is sent and no task is created. Approval or rejection applies only to
+the current run and is not saved or used to trigger an action.
 
 ## Setup
 
@@ -31,7 +32,19 @@ py -m venv .venv
 FastAPI, a database, and a model provider can be added when the workflow needs
 them; they are not required for these initial models.
 
-## Try the workflow
+## Review a draft
+
+After setup, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m business_operations
+```
+
+Enter a customer message, order ID, and order status, then review the proposed
+reply and follow-up. Enter `yes` to approve the draft or `no` to reject it.
+An invalid input or decision ends the run without recording a decision.
+
+## Use the drafting function
 
 After setup, start Python with `.\.venv\Scripts\python.exe` and enter:
 
