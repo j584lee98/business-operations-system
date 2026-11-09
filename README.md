@@ -21,16 +21,22 @@ but does not trigger an action.
 
 ## Setup
 
-Python 3.10 or later is required. From PowerShell in the project directory:
+Python 3.10 or later is required. Install [uv](https://docs.astral.sh/uv/getting-started/installation/),
+then run from PowerShell in the project directory:
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+uv sync --locked --extra dev
 .\.venv\Scripts\python.exe -m pytest
 ```
 
 SQLite is included with Python; no separate database service is needed.
 FastAPI and a model provider can be added when the workflow needs them.
+
+`uv.lock` records resolved dependencies across supported Python versions and
+platforms. Use `uv sync --locked --extra dev` to install them without changing
+the lockfile. When updating dependencies, run `uv lock --upgrade`, review the
+changes to `pyproject.toml` and `uv.lock`, then sync and run the checks.
+Build tools and the uv installer itself are not locked by `uv.lock`.
 
 ## Check before committing
 
@@ -60,12 +66,15 @@ To apply Python formatting before running the checks, run:
 
 GitHub Actions runs the same script on pushes, pull requests, and manual
 workflow dispatches. It tests Python 3.10 and 3.14 on Linux and Windows.
+Each combination runs once with locked dependencies and once with a fresh pip
+resolution from the declared ranges; the latter does not test every possible
+combination within those ranges.
 For pull requests, a separate CI job also checks the diff between the pull
 request's base commit and its checked-out merge commit for whitespace errors.
 The script's Git checks continue to inspect local staged and unstaged changes.
 
-Dependabot checks Python dependencies and GitHub Actions for updates weekly
-and proposes changes through pull requests.
+Dependabot checks the uv lockfile, Python dependency declarations, and GitHub
+Actions for updates weekly and proposes changes through pull requests.
 
 ## Review a draft
 
