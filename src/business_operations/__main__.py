@@ -8,7 +8,12 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from business_operations.models import OverdueOrderInput
-from business_operations.reviews import ReviewDecision, get_review, list_reviews, save_review
+from business_operations.reviews import (
+    ReviewDecision,
+    get_review,
+    list_reviews,
+    save_review,
+)
 from business_operations.workflows import draft_overdue_order_response
 
 
@@ -26,7 +31,9 @@ def main() -> int:
     if args.command == "show" and args.review_id <= 0:
         show_parser.error("review_id must be a positive integer")
     if args.command in ("list", "show"):
-        return show_saved_reviews(args.command, args.review_id if args.command == "show" else None)
+        return show_saved_reviews(
+            args.command, args.review_id if args.command == "show" else None
+        )
 
     return review_draft()
 
@@ -72,7 +79,9 @@ def review_draft() -> int:
     try:
         customer_message = input("Customer message: ")
         order_id = input("Order ID: ")
-        status = input("Order status (processing, shipped, delayed, delivered, unknown): ")
+        status = input(
+            "Order status (processing, shipped, delayed, delivered, unknown): "
+        )
         request = OverdueOrderInput.model_validate(
             {
                 "customer_message": customer_message,
@@ -92,7 +101,9 @@ def review_draft() -> int:
 
     decisions = {"yes": ReviewDecision.APPROVED, "no": ReviewDecision.REJECTED}
     if decision not in decisions:
-        print("Invalid decision; enter yes or no. No decision recorded.", file=sys.stderr)
+        print(
+            "Invalid decision; enter yes or no. No decision recorded.", file=sys.stderr
+        )
         return 2
 
     review_decision = decisions[decision]

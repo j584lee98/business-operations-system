@@ -45,7 +45,12 @@ def list_reviews(database_path: Path, limit: int = 50) -> list[ReviewSummary]:
             (limit,),
         ).fetchall()
     return [
-        ReviewSummary(id=row[0], reviewed_at=row[1], order_id=row[2], decision=ReviewDecision(row[3]))
+        ReviewSummary(
+            id=row[0],
+            reviewed_at=row[1],
+            order_id=row[2],
+            decision=ReviewDecision(row[3]),
+        )
         for row in rows
     ]
 
@@ -65,7 +70,10 @@ def get_review(database_path: Path, review_id: int) -> SavedReview | None:
         return None
     return SavedReview(
         summary=ReviewSummary(
-            id=row[0], reviewed_at=row[1], order_id=row[2], decision=ReviewDecision(row[3])
+            id=row[0],
+            reviewed_at=row[1],
+            order_id=row[2],
+            decision=ReviewDecision(row[3]),
         ),
         customer_message=row[4],
         order_status=row[5],

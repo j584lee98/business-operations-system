@@ -7,8 +7,16 @@ from business_operations.workflows import draft_overdue_order_response
 @pytest.mark.parametrize(
     ("status", "status_message", "follow_up"),
     [
-        (OrderStatus.PROCESSING, "The order is still being processed.", "Check the order's processing status."),
-        (OrderStatus.SHIPPED, "The order has shipped.", "Check the shipment's tracking status."),
+        (
+            OrderStatus.PROCESSING,
+            "The order is still being processed.",
+            "Check the order's processing status.",
+        ),
+        (
+            OrderStatus.SHIPPED,
+            "The order has shipped.",
+            "Check the shipment's tracking status.",
+        ),
         (
             OrderStatus.DELAYED,
             "The order is delayed.",
@@ -19,10 +27,16 @@ from business_operations.workflows import draft_overdue_order_response
             "The order is marked as delivered.",
             "Check the delivery details and whether the customer received the order.",
         ),
-        (OrderStatus.UNKNOWN, "The order's status is currently unknown.", "Check the current order status."),
+        (
+            OrderStatus.UNKNOWN,
+            "The order's status is currently unknown.",
+            "Check the current order status.",
+        ),
     ],
 )
-def test_draft_uses_order_status_and_identifies_follow_up(status, status_message, follow_up):
+def test_draft_uses_order_status_and_identifies_follow_up(
+    status, status_message, follow_up
+):
     workflow_input = OverdueOrderInput(
         customer_message="Where is my order?",
         order=Order(order_id="ORD-123", status=status),

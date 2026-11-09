@@ -16,9 +16,13 @@ def run_review(input_text, cwd):
     )
 
 
-@pytest.mark.parametrize(("decision", "result"), [("yes", "approved"), ("no", "rejected")])
+@pytest.mark.parametrize(
+    ("decision", "result"), [("yes", "approved"), ("no", "rejected")]
+)
 def test_review_shows_draft_and_saves_decision(decision, result, tmp_path):
-    completed = run_review(f"Where is my order?\nORD-123\ndelayed\n{decision}\n", tmp_path)
+    completed = run_review(
+        f"Where is my order?\nORD-123\ndelayed\n{decision}\n", tmp_path
+    )
 
     assert completed.returncode == 0
     assert "The order is delayed." in completed.stdout
@@ -36,7 +40,10 @@ def test_review_shows_draft_and_saves_decision(decision, result, tmp_path):
     reviewed_at, message, order_id, status, reply, follow_up, saved_decision = row
     assert reviewed_at.endswith("Z")
     assert (message, order_id, status, saved_decision) == (
-        "Where is my order?", "ORD-123", "delayed", result
+        "Where is my order?",
+        "ORD-123",
+        "delayed",
+        result,
     )
     assert reply in completed.stdout
     assert follow_up in completed.stdout
@@ -183,7 +190,10 @@ def test_list_empty_database_and_limits_results(tmp_path):
         connection.executemany(
             "INSERT INTO reviews (customer_message, order_id, order_status, "
             "proposed_reply, follow_up_task, decision) VALUES (?, ?, ?, ?, ?, ?)",
-            [("Message", f"ORD-{i}", "unknown", "Reply", "Follow up", "approved") for i in range(55)],
+            [
+                ("Message", f"ORD-{i}", "unknown", "Reply", "Follow up", "approved")
+                for i in range(55)
+            ],
         )
     listed = run_command(tmp_path, "list")
     assert listed.returncode == 0

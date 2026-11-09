@@ -1,7 +1,11 @@
 import pytest
 from pydantic import ValidationError
 
-from business_operations.models import OrderStatus, OverdueOrderInput, OverdueOrderOutput
+from business_operations.models import (
+    OrderStatus,
+    OverdueOrderInput,
+    OverdueOrderOutput,
+)
 
 
 def test_workflow_input_accepts_sample_order():
@@ -30,11 +34,24 @@ def test_workflow_output_accepts_a_draft_and_follow_up():
 @pytest.mark.parametrize(
     "data",
     [
-        {"customer_message": " ", "order": {"order_id": "ORD-123", "status": "delayed"}},
-        {"customer_message": "Where is it?", "order": {"order_id": "", "status": "delayed"}},
-        {"customer_message": "Where is it?", "order": {"order_id": "ORD-123", "status": "late"}},
+        {
+            "customer_message": " ",
+            "order": {"order_id": "ORD-123", "status": "delayed"},
+        },
+        {
+            "customer_message": "Where is it?",
+            "order": {"order_id": "", "status": "delayed"},
+        },
+        {
+            "customer_message": "Where is it?",
+            "order": {"order_id": "ORD-123", "status": "late"},
+        },
         {"customer_message": "Where is it?", "order": {"order_id": "ORD-123"}},
-        {"customer_message": "Where is it?", "order": {"order_id": "ORD-123", "status": "delayed"}, "extra": True},
+        {
+            "customer_message": "Where is it?",
+            "order": {"order_id": "ORD-123", "status": "delayed"},
+            "extra": True,
+        },
     ],
 )
 def test_workflow_input_rejects_invalid_data(data):
@@ -48,7 +65,11 @@ def test_workflow_input_rejects_invalid_data(data):
         {"proposed_reply": "", "follow_up_task": "Check the shipment status."},
         {"proposed_reply": "We will check.", "follow_up_task": " "},
         {"proposed_reply": "We will check."},
-        {"proposed_reply": "We will check.", "follow_up_task": "Check.", "approved": True},
+        {
+            "proposed_reply": "We will check.",
+            "follow_up_task": "Check.",
+            "approved": True,
+        },
     ],
 )
 def test_workflow_output_rejects_invalid_data(data):

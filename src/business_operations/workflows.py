@@ -1,9 +1,15 @@
 """Small, deterministic workflows for business operations."""
 
-from business_operations.models import OrderStatus, OverdueOrderInput, OverdueOrderOutput
+from business_operations.models import (
+    OrderStatus,
+    OverdueOrderInput,
+    OverdueOrderOutput,
+)
 
 
-def draft_overdue_order_response(workflow_input: OverdueOrderInput) -> OverdueOrderOutput:
+def draft_overdue_order_response(
+    workflow_input: OverdueOrderInput,
+) -> OverdueOrderOutput:
     """Prepare a draft and follow-up for an owner to review."""
     status_messages = {
         OrderStatus.PROCESSING: (

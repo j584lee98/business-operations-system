@@ -40,14 +40,19 @@ After setup, run the local checks with Bash (for example, Git Bash on Windows):
 bash scripts/check.sh
 ```
 
-The script runs Ruff's configured error and Pyflakes checks, the full pytest
-suite (unit and CLI integration tests), and Git whitespace checks for staged
-and unstaged changes. It stops and returns a nonzero exit code when a check
-fails. Git's whitespace checks do
-not include untracked files; stage new files before running the script to check
-them. The checks use the project virtual environment and do not install packages
-or modify source files. If dependencies are missing, rerun the install command
-above.
+The script runs Ruff's configured error, Pyflakes, and formatting checks, the
+full pytest suite (unit and CLI integration tests), and Git whitespace checks
+for staged and unstaged changes. It stops and returns a nonzero exit code when
+a check fails. Git's whitespace checks do not include untracked files; stage
+new files before running the script to check them. The checks use the project
+virtual environment and do not install packages or modify source files. If
+dependencies are missing, rerun the install command above.
+
+To apply Python formatting before running the checks, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff format src tests
+```
 
 GitHub Actions runs the same script on pushes, pull requests, and manual
 workflow dispatches. It tests Python 3.10 and 3.14 on Linux and Windows.
