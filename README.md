@@ -60,8 +60,9 @@ To apply Python formatting before running the checks, run:
 
 GitHub Actions runs the same script on pushes, pull requests, and manual
 workflow dispatches. It tests Python 3.10 and 3.14 on Linux and Windows.
-The script's Git whitespace checks inspect local staged and unstaged changes;
-on a clean CI checkout they do not check the submitted commit diff.
+For pull requests, a separate CI job also checks the diff between the pull
+request's base commit and its checked-out merge commit for whitespace errors.
+The script's Git checks continue to inspect local staged and unstaged changes.
 
 Dependabot checks Python dependencies and GitHub Actions for updates weekly
 and proposes changes through pull requests.

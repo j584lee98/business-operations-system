@@ -9,6 +9,21 @@ permissions:
   contents: read
 
 jobs:
+  pr-whitespace:
+    name: Pull request whitespace
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request merge commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check pull request diff for whitespace errors
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git --no-pager diff --check "$BASE_SHA" HEAD
+
   checks:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
