@@ -16,28 +16,41 @@ def run_review(input_text, cwd):
     )
 
 
+def review_input(message, order_id, status, decision, edited_reply=""):
+    return f"{message}\n{order_id}\n{status}\n{edited_reply}\n{decision}\n"
+
+
 @pytest.mark.parametrize(
     ("decision", "result"), [("yes", "approved"), ("no", "rejected")]
 )
 def test_review_shows_draft_and_saves_decision(decision, result, tmp_path):
     completed = run_review(
-        f"Where is my order?\nORD-123\ndelayed\n{decision}\n", tmp_path
+        review_input("Where is my order?", "ORD-123", "delayed", decision), tmp_path
     )
 
     assert completed.returncode == 0
     assert "The order is delayed." in completed.stdout
     assert "Check the cause of the delay" in completed.stdout
-    assert f"Draft {result} and saved as review 1." in completed.stdout
+    assert f"Reply {result} and saved as review 1." in completed.stdout
     assert "No message was sent and no task was created." in completed.stdout
     assert completed.stderr == ""
 
     with sqlite3.connect(tmp_path / "business_operations.sqlite3") as connection:
         row = connection.execute(
             "SELECT reviewed_at, customer_message, order_id, order_status, "
-            "proposed_reply, follow_up_task, decision FROM reviews"
+            "proposed_reply, reviewed_reply, follow_up_task, decision FROM reviews"
         ).fetchone()
     assert row is not None
-    reviewed_at, message, order_id, status, reply, follow_up, saved_decision = row
+    (
+        reviewed_at,
+        message,
+        order_id,
+        status,
+        reply,
+        reviewed_reply,
+        follow_up,
+        saved_decision,
+    ) = row
     assert reviewed_at.endswith("Z")
     assert (message, order_id, status, saved_decision) == (
         "Where is my order?",
@@ -46,6 +59,7 @@ def test_review_shows_draft_and_saves_decision(decision, result, tmp_path):
         result,
     )
     assert reply in completed.stdout
+    assert reviewed_reply == reply
     assert follow_up in completed.stdout
 
 
@@ -66,12 +80,15 @@ def test_review_rejects_invalid_order_input(input_text, tmp_path):
 
 
 def test_review_rejects_invalid_decision(tmp_path):
-    completed = run_review("Where is my order?\nORD-123\ndelayed\nmaybe\n", tmp_path)
+    completed = run_review(
+        review_input("Where is my order?", "ORD-123", "delayed", "maybe"),
+        tmp_path,
+    )
 
     assert completed.returncode == 2
     assert "No decision recorded." in completed.stderr
-    assert "Draft approved" not in completed.stdout
-    assert "Draft rejected" not in completed.stdout
+    assert "Reply approved" not in completed.stdout
+    assert "Reply rejected" not in completed.stdout
     assert not (tmp_path / "business_operations.sqlite3").exists()
 
 
@@ -80,13 +97,17 @@ def test_review_cancellation_does_not_record_decision(tmp_path):
 
     assert completed.returncode == 1
     assert "Review cancelled; no decision recorded." in completed.stderr
-    assert "Draft approved" not in completed.stdout
+    assert "Reply approved" not in completed.stdout
     assert not (tmp_path / "business_operations.sqlite3").exists()
 
 
 def test_reviews_persist_across_runs(tmp_path):
-    first = run_review("First message\nORD-123\ndelayed\nyes\n", tmp_path)
-    second = run_review("Second message\nORD-456\nunknown\nno\n", tmp_path)
+    first = run_review(
+        review_input("First message", "ORD-123", "delayed", "yes"), tmp_path
+    )
+    second = run_review(
+        review_input("Second message", "ORD-456", "unknown", "no"), tmp_path
+    )
 
     assert first.returncode == second.returncode == 0
     assert "saved as review 2" in second.stdout
@@ -100,11 +121,113 @@ def test_reviews_persist_across_runs(tmp_path):
 def test_review_reports_storage_failure(tmp_path):
     (tmp_path / "business_operations.sqlite3").mkdir()
 
-    completed = run_review("Where is my order?\nORD-123\ndelayed\nyes\n", tmp_path)
+    completed = run_review(
+        review_input("Where is my order?", "ORD-123", "delayed", "yes"),
+        tmp_path,
+    )
 
     assert completed.returncode == 1
     assert "Could not save review; no decision recorded:" in completed.stderr
-    assert "Draft approved" not in completed.stdout
+    assert "Reply approved" not in completed.stdout
+
+
+def test_review_persists_owner_edit_separately_from_generated_draft(tmp_path):
+    edited_reply = "I checked your order and expect delivery tomorrow."
+    completed = run_review(
+        review_input(
+            "Where is my order?",
+            "ORD-123",
+            "delayed",
+            "yes",
+            edited_reply,
+        ),
+        tmp_path,
+    )
+
+    assert completed.returncode == 0
+    assert "The order is delayed." in completed.stdout
+    assert f"Reply presented for approval:\n{edited_reply}" in completed.stdout
+    with sqlite3.connect(tmp_path / "business_operations.sqlite3") as connection:
+        original, reviewed, follow_up = connection.execute(
+            "SELECT proposed_reply, reviewed_reply, follow_up_task FROM reviews"
+        ).fetchone()
+    assert original != edited_reply
+    assert reviewed == edited_reply
+    assert "Check the cause of the delay" in follow_up
+
+    shown = run_command(tmp_path, "show", "1")
+    assert shown.returncode == 0
+    assert f"Proposed reply:\n{original}" in shown.stdout
+    assert f"Reply presented for approval:\n{edited_reply}" in shown.stdout
+
+
+def test_review_migrates_existing_database_without_losing_history(tmp_path):
+    database_path = tmp_path / "business_operations.sqlite3"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE reviews (
+                id INTEGER PRIMARY KEY,
+                reviewed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                customer_message TEXT NOT NULL,
+                order_id TEXT NOT NULL,
+                order_status TEXT NOT NULL,
+                proposed_reply TEXT NOT NULL,
+                follow_up_task TEXT NOT NULL,
+                decision TEXT NOT NULL CHECK (decision IN ('approved', 'rejected'))
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO reviews (customer_message, order_id, order_status, "
+            "proposed_reply, follow_up_task, decision) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "Old message",
+                "OLD-1",
+                "shipped",
+                "Old reply",
+                "Old follow-up",
+                "approved",
+            ),
+        )
+
+    old_review_before_migration = run_command(tmp_path, "show", "1")
+    assert old_review_before_migration.returncode == 0
+    assert "Proposed reply:\nOld reply" in old_review_before_migration.stdout
+    assert "Reply presented for approval:" not in old_review_before_migration.stdout
+
+    completed = run_review(
+        review_input("New message", "NEW-2", "delayed", "no", "Revised response"),
+        tmp_path,
+    )
+
+    assert completed.returncode == 0
+    with sqlite3.connect(database_path) as connection:
+        rows = connection.execute(
+            "SELECT order_id, proposed_reply, reviewed_reply, decision "
+            "FROM reviews ORDER BY id"
+        ).fetchall()
+    assert rows[0] == ("OLD-1", "Old reply", None, "approved")
+    assert rows[1][0] == "NEW-2"
+    assert rows[1][1] != "Revised response"
+    assert rows[1][2:] == ("Revised response", "rejected")
+
+    old_review = run_command(tmp_path, "show", "1")
+    assert old_review.returncode == 0
+    assert "Proposed reply:\nOld reply" in old_review.stdout
+    assert "Reply presented for approval:" not in old_review.stdout
+
+
+def test_cancelling_after_edit_does_not_save_review(tmp_path):
+    completed = run_review(
+        "Where is my order?\nORD-123\ndelayed\nEdited reply\n",
+        tmp_path,
+    )
+
+    assert completed.returncode == 1
+    assert "Review cancelled; no decision recorded." in completed.stderr
+    assert not (tmp_path / "business_operations.sqlite3").exists()
 
 
 def run_command(cwd, *args):
@@ -118,8 +241,12 @@ def run_command(cwd, *args):
 
 
 def test_list_and_show_saved_reviews(tmp_path):
-    first = run_review("First message\nORD-123\ndelayed\nyes\n", tmp_path)
-    second = run_review("Second message\nORD-456\nunknown\nno\n", tmp_path)
+    first = run_review(
+        review_input("First message", "ORD-123", "delayed", "yes"), tmp_path
+    )
+    second = run_review(
+        review_input("Second message", "ORD-456", "unknown", "no"), tmp_path
+    )
     assert first.returncode == second.returncode == 0
     database_path = tmp_path / "business_operations.sqlite3"
     original_database = database_path.read_bytes()
@@ -144,6 +271,7 @@ def test_list_and_show_saved_reviews(tmp_path):
     assert "Customer message:\nFirst message" in shown.stdout
     assert f"Reviewed at (UTC): {reviewed_at}" in shown.stdout
     assert f"Proposed reply:\n{reply}" in shown.stdout
+    assert f"Reply presented for approval:\n{reply}" in shown.stdout
     assert f"Suggested follow-up:\n{follow_up}" in shown.stdout
     assert database_path.read_bytes() == original_database
 
@@ -157,7 +285,12 @@ def test_history_does_not_create_missing_database(tmp_path, args):
 
 
 def test_show_missing_review(tmp_path):
-    assert run_review("Message\nORD-123\ndelayed\nyes\n", tmp_path).returncode == 0
+    assert (
+        run_review(
+            review_input("Message", "ORD-123", "delayed", "yes"), tmp_path
+        ).returncode
+        == 0
+    )
     completed = run_command(tmp_path, "show", "99")
     assert completed.returncode == 1
     assert "Review 99 not found." in completed.stderr
@@ -179,7 +312,12 @@ def test_history_reports_invalid_database(tmp_path):
 
 
 def test_list_empty_database_and_limits_results(tmp_path):
-    assert run_review("Message\nORD-123\ndelayed\nyes\n", tmp_path).returncode == 0
+    assert (
+        run_review(
+            review_input("Message", "ORD-123", "delayed", "yes"), tmp_path
+        ).returncode
+        == 0
+    )
     with sqlite3.connect(tmp_path / "business_operations.sqlite3") as connection:
         connection.execute("DELETE FROM reviews")
     empty = run_command(tmp_path, "list")

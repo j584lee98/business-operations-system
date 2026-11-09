@@ -28,6 +28,7 @@ class SavedReview:
     customer_message: str
     order_status: str
     proposed_reply: str
+    reviewed_reply: str | None
     follow_up_task: str
 
 
@@ -58,10 +59,14 @@ def list_reviews(database_path: Path, limit: int = 50) -> list[ReviewSummary]:
 def get_review(database_path: Path, review_id: int) -> SavedReview | None:
     """Return the exact stored review, or None when its ID does not exist."""
     with closing(_open_readonly(database_path)) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(reviews)")}
+        reviewed_reply_column = (
+            "reviewed_reply" if "reviewed_reply" in columns else "NULL"
+        )
         row = connection.execute(
-            """
+            f"""
             SELECT id, reviewed_at, order_id, decision, customer_message,
-                   order_status, proposed_reply, follow_up_task
+                   order_status, proposed_reply, {reviewed_reply_column}, follow_up_task
             FROM reviews WHERE id = ?
             """,
             (review_id,),
@@ -78,7 +83,8 @@ def get_review(database_path: Path, review_id: int) -> SavedReview | None:
         customer_message=row[4],
         order_status=row[5],
         proposed_reply=row[6],
-        follow_up_task=row[7],
+        reviewed_reply=row[7],
+        follow_up_task=row[8],
     )
 
 
@@ -86,6 +92,7 @@ def save_review(
     database_path: Path,
     request: OverdueOrderInput,
     draft: OverdueOrderOutput,
+    reviewed_reply: OverdueOrderOutput,
     decision: ReviewDecision,
 ) -> int:
     """Save a completed review and return its local ID."""
@@ -99,22 +106,28 @@ def save_review(
                 order_id TEXT NOT NULL,
                 order_status TEXT NOT NULL,
                 proposed_reply TEXT NOT NULL,
+                reviewed_reply TEXT,
                 follow_up_task TEXT NOT NULL,
                 decision TEXT NOT NULL CHECK (decision IN ('approved', 'rejected'))
             )
             """
         )
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(reviews)")}
+        if "reviewed_reply" not in columns:
+            connection.execute("ALTER TABLE reviews ADD COLUMN reviewed_reply TEXT")
         cursor = connection.execute(
             """
             INSERT INTO reviews
-                (customer_message, order_id, order_status, proposed_reply, follow_up_task, decision)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (customer_message, order_id, order_status, proposed_reply,
+                 reviewed_reply, follow_up_task, decision)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 request.customer_message,
                 request.order.order_id,
                 request.order.status.value,
                 draft.proposed_reply,
+                reviewed_reply.proposed_reply,
                 draft.follow_up_task,
                 decision.value,
             ),

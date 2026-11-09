@@ -84,13 +84,17 @@ After setup, run:
 .\.venv\Scripts\python.exe -m business_operations
 ```
 
-Enter a customer message, order ID, and order status, then review the proposed
-reply and follow-up. Enter `yes` to approve the draft or `no` to reject it.
-An invalid input or decision ends the run without recording a decision.
+Enter a customer message, order ID, and order status. You can optionally
+replace the proposed reply before deciding whether to approve or reject it.
+The saved review retains both the generated reply and the exact reply presented
+for approval. An invalid input or decision ends the run without recording a
+decision.
 
 Completed reviews are saved to `business_operations.sqlite3` in the current
-working directory, along with the customer message, order details, draft,
-decision, and UTC review time. Runs from different directories use different
+working directory, along with the customer message, order details, generated
+reply, reply presented for approval, decision, and UTC review time. Existing
+databases are upgraded automatically when a new review is saved; earlier
+reviews remain readable. Runs from different directories use different
 databases. The file is ignored by Git, but is not encrypted: use sample data
 until appropriate data protection is in place. If saving fails, the program
 reports an error instead of confirming the decision.

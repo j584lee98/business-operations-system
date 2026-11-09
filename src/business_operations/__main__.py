@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from business_operations.models import OverdueOrderInput
+from business_operations.models import OverdueOrderInput, OverdueOrderOutput
 from business_operations.reviews import (
     ReviewDecision,
     get_review,
@@ -59,6 +59,11 @@ def show_saved_reviews(command: str, review_id: int | None) -> int:
         if review is None:
             print(f"Review {review_id} not found.", file=sys.stderr)
             return 1
+        reviewed_reply_text = (
+            f"\nReply presented for approval:\n{review.reviewed_reply}\n"
+            if review.reviewed_reply is not None
+            else ""
+        )
         print(
             f"Review: {review.summary.id}\n"
             f"Reviewed at (UTC): {review.summary.reviewed_at}\n"
@@ -67,6 +72,7 @@ def show_saved_reviews(command: str, review_id: int | None) -> int:
             f"Order status: {review.order_status}\n"
             f"\nCustomer message:\n{review.customer_message}\n"
             f"\nProposed reply:\n{review.proposed_reply}\n"
+            f"{reviewed_reply_text}"
             f"\nSuggested follow-up:\n{review.follow_up_task}"
         )
         return 0
@@ -90,6 +96,14 @@ def review_draft() -> int:
         )
         draft = draft_overdue_order_response(request)
         print(f"\nProposed reply:\n{draft.proposed_reply}")
+        edited_reply = input("Edit reply (press Enter to keep as proposed): ")
+        reviewed_reply = OverdueOrderOutput(
+            proposed_reply=edited_reply
+            if edited_reply.strip()
+            else draft.proposed_reply,
+            follow_up_task=draft.follow_up_task,
+        )
+        print(f"\nReply presented for approval:\n{reviewed_reply.proposed_reply}")
         print(f"\nSuggested follow-up:\n{draft.follow_up_task}")
         decision = input("\nApprove this draft? (yes/no): ").strip().lower()
     except ValidationError as error:
@@ -108,13 +122,15 @@ def review_draft() -> int:
 
     review_decision = decisions[decision]
     try:
-        review_id = save_review(DATABASE_PATH, request, draft, review_decision)
+        review_id = save_review(
+            DATABASE_PATH, request, draft, reviewed_reply, review_decision
+        )
     except sqlite3.Error as error:
         print(f"Could not save review; no decision recorded: {error}", file=sys.stderr)
         return 1
 
     print(
-        f"Draft {review_decision.value} and saved as review {review_id}. "
+        f"Reply {review_decision.value} and saved as review {review_id}. "
         "No message was sent and no task was created."
     )
     return 0
