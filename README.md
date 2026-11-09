@@ -54,6 +54,9 @@ workflow dispatches. It tests Python 3.10 and 3.14 on Linux and Windows.
 The script's Git whitespace checks inspect local staged and unstaged changes;
 on a clean CI checkout they do not check the submitted commit diff.
 
+Dependabot checks Python dependencies and GitHub Actions for updates weekly
+and proposes changes through pull requests.
+
 ## Review a draft
 
 After setup, run:
