@@ -47,10 +47,10 @@ def show_saved_reviews(command: str, review_id: int | None) -> int:
             reviews = list_reviews(DATABASE_PATH)
             if not reviews:
                 print("No saved reviews.")
-            for review in reviews:
+            for summary in reviews:
                 print(
-                    f"{review.id}\t{review.reviewed_at}\t"
-                    f"{review.order_id}\t{review.decision.value}"
+                    f"{summary.id}\t{summary.reviewed_at}\t"
+                    f"{summary.order_id}\t{summary.decision.value}"
                 )
             return 0
 

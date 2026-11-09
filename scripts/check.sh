@@ -19,6 +19,9 @@ printf '\n%s\n' '==> Linting with Ruff'
 printf '\n%s\n' '==> Checking formatting with Ruff'
 "$python" -m ruff format --check src tests
 
+printf '\n%s\n' '==> Type checking with mypy'
+"$python" -m mypy
+
 printf '\n%s\n' '==> Running unit and integration tests'
 "$python" -m pytest
 

@@ -14,6 +14,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "mypy>=1.15,<2",
     "pytest>=8,<10",
     "ruff>=0.11,<1",
 ]
@@ -23,6 +24,11 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+check_untyped_defs = true
 
 [tool.ruff]
 line-length = 88

@@ -40,13 +40,17 @@ After setup, run the local checks with Bash (for example, Git Bash on Windows):
 bash scripts/check.sh
 ```
 
-The script runs Ruff's configured error, Pyflakes, and formatting checks, the
-full pytest suite (unit and CLI integration tests), and Git whitespace checks
-for staged and unstaged changes. It stops and returns a nonzero exit code when
-a check fails. Git's whitespace checks do not include untracked files; stage
-new files before running the script to check them. The checks use the project
-virtual environment and do not install packages or modify source files. If
-dependencies are missing, rerun the install command above.
+The script runs Ruff's configured error, Pyflakes, and formatting checks,
+mypy type checking, the full pytest suite (unit and CLI integration tests),
+and Git whitespace checks for staged and unstaged changes. It stops and returns
+a nonzero exit code when a check fails. Git's whitespace checks do not include
+untracked files; stage new files before running the script to check them. The
+checks use the project virtual environment and do not install packages or
+modify source files. If dependencies are missing, rerun the install command
+above.
+
+Mypy checks application code in `src` against Python 3.10, including function
+bodies without annotations. Tests are not yet included in type checking.
 
 To apply Python formatting before running the checks, run:
 
