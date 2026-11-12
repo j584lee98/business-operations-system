@@ -339,3 +339,89 @@ def test_list_empty_database_and_limits_results(tmp_path):
     assert len(lines) == 50
     assert lines[0].startswith("55\t")
     assert lines[-1].startswith("6\t")
+
+
+def test_list_filters_older_reviews_before_limit(tmp_path):
+    assert (
+        run_review(
+            review_input("Message", "ORD-OLD", "delayed", "yes"), tmp_path
+        ).returncode
+        == 0
+    )
+    database_path = tmp_path / "business_operations.sqlite3"
+    with sqlite3.connect(database_path) as connection:
+        connection.executemany(
+            "INSERT INTO reviews (customer_message, order_id, order_status, "
+            "proposed_reply, follow_up_task, decision) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                ("Message", "ORD-NEW", "unknown", "Reply", "Follow up", "rejected")
+                for _ in range(55)
+            ],
+        )
+    original_database = database_path.read_bytes()
+
+    filtered = run_command(
+        tmp_path, "list", "--order-id", "ORD-OLD", "--decision", "approved"
+    )
+    assert filtered.returncode == 0
+    assert filtered.stdout.splitlines()[0].startswith("1\t")
+    assert filtered.stdout.splitlines()[0].endswith("\tORD-OLD\tapproved")
+    assert len(filtered.stdout.splitlines()) == 1
+    assert database_path.read_bytes() == original_database
+
+
+def test_list_filters_order_and_decision_independently(tmp_path):
+    for order_id, decision in (
+        ("ORD-1", "yes"),
+        ("ORD-1", "no"),
+        ("ORD-2", "yes"),
+    ):
+        assert (
+            run_review(
+                review_input("Message", order_id, "delayed", decision), tmp_path
+            ).returncode
+            == 0
+        )
+
+    by_order = run_command(tmp_path, "list", "--order-id", "ORD-1")
+    assert by_order.returncode == 0
+    assert [line.split("\t")[0] for line in by_order.stdout.splitlines()] == ["2", "1"]
+    approved = run_command(tmp_path, "list", "--decision", "approved")
+    assert approved.returncode == 0
+    assert [line.split("\t")[0] for line in approved.stdout.splitlines()] == ["3", "1"]
+    both = run_command(
+        tmp_path, "list", "--order-id", "ORD-1", "--decision", "rejected"
+    )
+    assert both.returncode == 0
+    assert [line.split("\t")[0] for line in both.stdout.splitlines()] == ["2"]
+    no_match = run_command(tmp_path, "list", "--order-id", "ord-1")
+    assert no_match.returncode == 0
+    assert "No saved reviews match the filters." in no_match.stdout
+
+
+@pytest.mark.parametrize("args", [("--order-id", "  "), ("--decision", "maybe")])
+def test_list_rejects_invalid_filters_before_accessing_database(tmp_path, args):
+    completed = run_command(tmp_path, "list", *args)
+    assert completed.returncode == 2
+    assert "error:" in completed.stderr
+    assert not (tmp_path / "business_operations.sqlite3").exists()
+
+
+def test_list_treats_order_id_as_data(tmp_path):
+    order_id = "ORD-' OR 1=1 --"
+    assert (
+        run_review(
+            review_input("Message", order_id, "unknown", "yes"), tmp_path
+        ).returncode
+        == 0
+    )
+    assert (
+        run_review(
+            review_input("Message", "OTHER", "unknown", "yes"), tmp_path
+        ).returncode
+        == 0
+    )
+    result = run_command(tmp_path, "list", "--order-id", order_id)
+    assert result.returncode == 0
+    assert len(result.stdout.splitlines()) == 1
+    assert result.stdout.splitlines()[0].endswith(f"\t{order_id}\tapproved")

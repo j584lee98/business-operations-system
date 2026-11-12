@@ -36,14 +36,33 @@ def _open_readonly(database_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"{database_path.resolve().as_uri()}?mode=ro", uri=True)
 
 
-def list_reviews(database_path: Path, limit: int = 50) -> list[ReviewSummary]:
+def list_reviews(
+    database_path: Path,
+    limit: int = 50,
+    *,
+    order_id: str | None = None,
+    decision: ReviewDecision | None = None,
+) -> list[ReviewSummary]:
     """Return recent reviews without creating or changing the database."""
     if limit <= 0:
         raise ValueError("limit must be positive")
+    if order_id is not None and not order_id.strip():
+        raise ValueError("order_id must not be blank")
+    conditions = []
+    parameters: list[str | int] = []
+    if order_id is not None:
+        conditions.append("order_id = ?")
+        parameters.append(order_id.strip())
+    if decision is not None:
+        conditions.append("decision = ?")
+        parameters.append(decision.value)
+    where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+    parameters.append(limit)
     with closing(_open_readonly(database_path)) as connection:
         rows = connection.execute(
-            "SELECT id, reviewed_at, order_id, decision FROM reviews ORDER BY id DESC LIMIT ?",
-            (limit,),
+            "SELECT id, reviewed_at, order_id, decision FROM reviews"
+            f"{where_clause} ORDER BY id DESC LIMIT ?",
+            parameters,
         ).fetchall()
     return [
         ReviewSummary(

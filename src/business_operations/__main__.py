@@ -23,30 +23,56 @@ DATABASE_PATH = Path("business_operations.sqlite3")
 def main() -> int:
     parser = argparse.ArgumentParser(description="Review overdue-order drafts.")
     commands = parser.add_subparsers(dest="command")
-    commands.add_parser("list", help="List the 50 most recent saved reviews.")
+    list_parser = commands.add_parser(
+        "list", help="List the 50 most recent saved reviews."
+    )
+    list_parser.add_argument(
+        "--order-id", type=nonempty_order_id, help="Exact order ID."
+    )
+    list_parser.add_argument(
+        "--decision",
+        choices=[decision.value for decision in ReviewDecision],
+        help="Filter by review decision.",
+    )
     show_parser = commands.add_parser("show", help="Show a saved review.")
     show_parser.add_argument("review_id", type=int, help="Positive review ID.")
     args = parser.parse_args()
 
     if args.command == "show" and args.review_id <= 0:
         show_parser.error("review_id must be a positive integer")
-    if args.command in ("list", "show"):
-        return show_saved_reviews(
-            args.command, args.review_id if args.command == "show" else None
-        )
+    if args.command == "list":
+        decision = ReviewDecision(args.decision) if args.decision is not None else None
+        return show_saved_reviews("list", None, args.order_id, decision)
+    if args.command == "show":
+        return show_saved_reviews("show", args.review_id)
 
     return review_draft()
 
 
-def show_saved_reviews(command: str, review_id: int | None) -> int:
+def nonempty_order_id(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise argparse.ArgumentTypeError("order ID must not be blank")
+    return value
+
+
+def show_saved_reviews(
+    command: str,
+    review_id: int | None,
+    order_id: str | None = None,
+    decision: ReviewDecision | None = None,
+) -> int:
     if not DATABASE_PATH.exists():
         print("No review database found in the current directory.", file=sys.stderr)
         return 1
     try:
         if command == "list":
-            reviews = list_reviews(DATABASE_PATH)
+            reviews = list_reviews(DATABASE_PATH, order_id=order_id, decision=decision)
             if not reviews:
-                print("No saved reviews.")
+                if order_id is not None or decision is not None:
+                    print("No saved reviews match the filters.")
+                else:
+                    print("No saved reviews.")
             for summary in reviews:
                 print(
                     f"{summary.id}\t{summary.reviewed_at}\t"

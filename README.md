@@ -103,13 +103,16 @@ To inspect saved reviews from PowerShell in the same directory:
 
 ```powershell
 .\.venv\Scripts\python.exe -m business_operations list
+.\.venv\Scripts\python.exe -m business_operations list --order-id ORD-123 --decision approved
 .\.venv\Scripts\python.exe -m business_operations show 1
 ```
 
 `list` shows up to 50 reviews, newest first, with their IDs, UTC review times,
 order IDs, and decisions. `show` displays the saved request and draft for a
-specific review ID. These commands only read the database; they do not create
-one if it is missing or change any review.
+specific review ID. Optionally filter `list` by exact, case-sensitive
+`--order-id`, `--decision` (`approved` or `rejected`), or both. Filters apply
+before the 50-result limit. These commands only read the database; they do not
+create one if it is missing or change any review.
 
 ## Use the drafting function
 
