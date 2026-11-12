@@ -6,8 +6,8 @@ an owner respond to a customer asking about an overdue order.
 ## Current scope
 
 This project defines validated input and output models, a deterministic
-drafting function, and a terminal-based draft review. It does not send replies,
-create tasks, or connect to external services.
+drafting function, a local draft-preview API, and a terminal-based draft
+review. It does not send replies, create tasks, or connect to external services.
 
 The input contains a customer message and an order ID and status. The output
 contains a proposed reply and a follow-up task. `unknown` is available when the
@@ -30,7 +30,7 @@ uv sync --locked --extra dev
 ```
 
 SQLite is included with Python; no separate database service is needed.
-FastAPI and a model provider can be added when the workflow needs them.
+A model provider can be added when the workflow needs one.
 
 `uv.lock` records resolved dependencies across supported Python versions and
 platforms. Use `uv sync --locked --extra dev` to install them without changing
@@ -130,3 +130,27 @@ draft = draft_overdue_order_response(request)
 print(draft.proposed_reply)
 print(draft.follow_up_task)
 ```
+
+## Preview a draft through the API
+
+Start the local server from the project directory:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn business_operations.api:app --host 127.0.0.1 --port 8000
+```
+
+In another PowerShell terminal, send a sample request:
+
+```powershell
+$body = @{
+    customer_message = "Where is my order?"
+    order = @{ order_id = "ORD-123"; status = "delayed" }
+} | ConvertTo-Json
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/overdue-order/draft" -Method Post -ContentType "application/json" -Body $body
+```
+
+The endpoint returns a proposed reply and follow-up task, or a validation error
+for invalid input. It does not save reviews, approve or send replies, or create
+tasks. This development API has no authentication; keep it bound to localhost
+and use sample data. Interactive API documentation is available at
+`http://127.0.0.1:8000/docs` while the server is running.
